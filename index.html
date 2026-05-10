@@ -6,47 +6,47 @@
     <title>Isekai RPG Online</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; touch-action: none; }
-        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; text-align: center; }
-        .btn { padding: 15px 30px; margin: 10px; cursor: pointer; background: #222; color: white; border: 2px solid #00ffcc; border-radius: 10px; width: 250px; font-weight: bold; }
+        #overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; z-index: 100; text-align: center; }
+        .btn { padding: 15px 30px; margin: 10px; background: #222; color: white; border: 2px solid #00ffcc; border-radius: 10px; width: 220px; font-weight: bold; cursor: pointer; }
+        
+        /* Gameplay UI */
         #ui { position: absolute; top: 20px; left: 20px; color: #00ffcc; pointer-events: none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; display: none; z-index: 50; }
-        
+        #attack-btn { position: absolute; bottom: 50px; right: 50px; width: 85px; height: 85px; background: rgba(255,0,0,0.7); border: 4px solid white; border-radius: 50%; color: white; font-weight: bold; display: none; z-index: 50; outline: none; }
+        #attack-btn:active { background: white; color: red; }
+
         /* Joystick */
-        #joy-container { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid rgba(0,255,204,0.3); border-radius: 50%; display: none; }
-        #joy-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; box-shadow: 0 0 15px #00ffcc; }
-        
-        #loading { color: #00ffcc; margin-top: 10px; font-style: italic; }
+        #joy-container { position: absolute; bottom: 50px; left: 50px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border: 2px solid #00ffcc; border-radius: 50%; display: none; }
+        #joy-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: #fff; border-radius: 50%; }
     </style>
 </head>
 <body>
 
     <div id="overlay">
         <h1 id="menuTitle">ISEKAI WORLD</h1>
-        
         <div id="loginSection">
-            <p>ဂိမ်းဆော့ရန် Google နှင့် Login အရင်ဝင်ပေးပါ</p>
             <button class="btn" style="border-color: #4285F4;" onclick="signIn()">Sign in with Google</button>
-            <div id="loading">Checking login status...</div>
         </div>
-
         <div id="genderSection" style="display:none;">
-            <p>သင်၏ လိင်အမျိုးအစားကို ရွေးချယ်ပါ</p>
-            <button class="btn" onclick="setGender('Male')">Male (ကျား)</button>
-            <button class="btn" onclick="setGender('Female')">Female (မ)</button>
+            <p>Select Gender</p>
+            <button class="btn" onclick="setGender('Male')">Male</button>
+            <button class="btn" onclick="setGender('Female')">Female</button>
         </div>
-
         <div id="classSection" style="display:none;">
-            <p>သင်၏ Class ကို ရွေးချယ်ပါ</p>
-            <button class="btn" onclick="startIsekai('Warrior')">Warrior (ဓားသမား)</button>
-            <button class="btn" onclick="startIsekai('Archer')">Archer (မြှားသမား)</button>
-            <button class="btn" onclick="startIsekai('Mage')">Mage (မှော်ဆရာ)</button>
+            <p>Select Your Class</p>
+            <button class="btn" onclick="startIsekai('Warrior')">Warrior</button>
+            <button class="btn" onclick="startIsekai('Archer')">Archer</button>
+            <button class="btn" onclick="startIsekai('Mage')">Mage</button>
         </div>
     </div>
 
-    <div id="joy-container"><div id="joy-stick"></div></div>
     <div id="ui">
         <b>Name:</b> <span id="nDisplay">-</span><br>
-        <b>Class:</b> <span id="cDisplay">-</span> | <b>Weapon:</b> <span id="wDisplay">-</span>
+        <b>Class:</b> <span id="cDisplay">-</span><br>
+        <b>Monsters Killed:</b> <span id="kills">0</span>
     </div>
+    
+    <button id="attack-btn" onclick="playerAttack()">ATTACK</button>
+    <div id="joy-container"><div id="joy-stick"></div></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -70,83 +70,46 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        let gender, pClass, weapon, user;
-        let playerObj, scene, camera, renderer;
-        let moveX = 0, moveZ = 0;
+        let user, playerObj, scene, camera, renderer;
+        let moveX = 0, moveZ = 0, killCount = 0;
+        let monsters = [];
 
-        // Login Function (စာမျက်နှာတစ်ခုလုံးကို Redirect လုပ်မည်)
-        window.signIn = () => {
-            document.getElementById('loading').innerText = "Redirecting to Google...";
-            signInWithRedirect(auth, provider);
-        };
+        window.signIn = () => signInWithRedirect(auth, provider);
 
-        // Page ပြန်ပွင့်လာချိန်တွင် Login ဖြစ်မဖြစ် စစ်ဆေးခြင်း
         onAuthStateChanged(auth, (u) => {
             if (u) {
                 user = u;
-                onLoginSuccess();
-            } else {
-                document.getElementById('loading').innerText = "Please login to start.";
+                document.getElementById('loginSection').style.display = "none";
+                document.getElementById('genderSection').style.display = "block";
+                document.getElementById('nDisplay').innerText = user.displayName;
             }
         });
 
-        function onLoginSuccess() {
-            document.getElementById('loginSection').style.display = "none";
-            document.getElementById('nDisplay').innerText = user.displayName;
-            
-            // Database ထဲမှာ user ရှိပြီးသားလား စစ်ဆေးခြင်း
-            get(ref(db, 'players/' + user.uid)).then((snapshot) => {
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    pClass = data.class;
-                    weapon = data.weapon;
-                    gender = data.gender;
-                    startGameplay();
-                } else {
-                    document.getElementById('genderSection').style.display = "block";
-                    document.getElementById('menuTitle').innerText = "Welcome, " + user.displayName;
-                }
-            });
-        }
-
         window.setGender = (g) => {
-            gender = g;
             document.getElementById('genderSection').style.display = "none";
             document.getElementById('classSection').style.display = "block";
         };
 
         window.startIsekai = (c) => {
-            pClass = c;
-            weapon = (c==='Warrior') ? "Steel Sword" : (c==='Archer' ? "Long Bow" : "Magic Staff");
-            set(ref(db, 'players/' + user.uid), {
-                name: user.displayName,
-                gender: gender,
-                class: pClass,
-                weapon: weapon,
-                level: 1,
-                hp: 100,
-                lastSeen: Date.now()
-            }).then(() => startGameplay());
-        };
-
-        function startGameplay() {
             document.getElementById('overlay').style.display = "none";
             document.getElementById('joy-container').style.display = "block";
+            document.getElementById('attack-btn').style.display = "block";
             document.getElementById('ui').style.display = "block";
-            document.getElementById('cDisplay').innerText = pClass;
-            document.getElementById('wDisplay').innerText = weapon;
+            document.getElementById('cDisplay').innerText = c;
             init3D();
-        }
+            setInterval(spawnMonster, 4000); // 4 စက္ကန့်တိုင်း Monster တစ်ကောင် ပေါ်မယ်
+        };
 
         function init3D() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x020205);
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            scene.add(new THREE.GridHelper(200, 40, 0x00ffcc, 0x111111));
+            scene.add(new THREE.GridHelper(100, 40, 0x00ffcc, 0x111111));
+            
+            // Player ကို အပြာရောင် Cube အနေနဲ့ ထည့်မယ်
             playerObj = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshPhongMaterial({ color: 0x00ffcc }));
             playerObj.position.y = 1;
             scene.add(playerObj);
@@ -160,29 +123,25 @@
             animate();
         }
 
-        // Joystick Control
-        const joyStick = document.getElementById('joy-stick');
-        const joyContainer = document.getElementById('joy-container');
+        function spawnMonster() {
+            // Monster ကို အနီရောင် Cube အနေနဲ့ ထည့်မယ်
+            const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+            m.position.set(Math.random()*40-20, 0.5, Math.random()*40-20);
+            scene.add(m);
+            monsters.push(m);
+        }
 
-        joyContainer.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = joyContainer.getBoundingClientRect();
-            const centerX = rect.left + rect.width/2;
-            const centerY = rect.top + rect.height/2;
-            let deltaX = touch.clientX - centerX;
-            let deltaY = touch.clientY - centerY;
-            const dist = Math.min(Math.sqrt(deltaX*deltaX + deltaY*deltaY), 40);
-            const angle = Math.atan2(deltaY, deltaX);
-            moveX = Math.cos(angle) * (dist/40) * 0.2;
-            moveZ = Math.sin(angle) * (dist/40) * 0.2;
-            joyStick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
-        });
-
-        joyContainer.addEventListener('touchend', () => {
-            moveX = 0; moveZ = 0;
-            joyStick.style.transform = `translate(0px, 0px)`;
-        });
+        window.playerAttack = () => {
+            // Player နဲ့ အနီးဆုံးက Monster ကို ရှာပြီး ဓားနဲ့ခုတ်မယ်
+            monsters.forEach((m, index) => {
+                if(m.position.distanceTo(playerObj.position) < 3.5) {
+                    scene.remove(m);
+                    monsters.splice(index, 1);
+                    killCount++;
+                    document.getElementById('kills').innerText = killCount;
+                }
+            });
+        };
 
         function animate() {
             requestAnimationFrame(animate);
@@ -191,10 +150,33 @@
                 playerObj.position.z += moveZ;
                 camera.position.set(playerObj.position.x, 5, playerObj.position.z + 10);
                 camera.lookAt(playerObj.position);
+
+                // Monster တွေက Player ဆီကို လာနေမယ်
+                monsters.forEach(m => {
+                    const dx = playerObj.position.x - m.position.x;
+                    const dz = playerObj.position.z - m.position.z;
+                    m.position.x += dx * 0.005;
+                    m.position.z += dz * 0.005;
+                });
             }
             renderer.render(scene, camera);
         }
+
+        // Joystick Control
+        const joyStick = document.getElementById('joy-stick');
+        const joyContainer = document.getElementById('joy-container');
+        joyContainer.addEventListener('touchmove', (e) => {
+            const touch = e.touches[0];
+            const rect = joyContainer.getBoundingClientRect();
+            const dx = touch.clientX - (rect.left + 60);
+            const dy = touch.clientY - (rect.top + 60);
+            const dist = Math.min(Math.sqrt(dx*dx + dy*dy), 40);
+            const angle = Math.atan2(dy, dx);
+            moveX = Math.cos(angle) * (dist/40) * 0.15;
+            moveZ = Math.sin(angle) * (dist/40) * 0.15;
+            joyStick.style.transform = `translate(${Math.cos(angle)*dist}px, ${Math.sin(angle)*dist}px)`;
+        });
+        joyContainer.addEventListener('touchend', () => { moveX = 0; moveZ = 0; joyStick.style.transform = "none"; });
     </script>
 </body>
 </html>
-
