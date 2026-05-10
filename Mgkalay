@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>My Video Website</title>
+</head>
+
+<body>
+
+<h1>My Videos</h1>
+
+<video width="300" controls>
+<source src="video.mp4" type="video/mp4">
+</video>
+
+</body>
+</html>
+<!DOCTYPE html>
+<html>
+<head>
+<title>My Video Site</title>
+</head>
+
+<body>
+<h1>My Video</h1>
+
+<video width="300" controls>
+<source src="video.mp4" type="video/mp4">
+</video>
+
+</body>
+</html>
